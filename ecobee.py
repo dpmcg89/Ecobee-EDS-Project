@@ -1,37 +1,42 @@
 # ecobee Edge Data Store Historian
 # Simple Python script to read ecobee data remotely for a thermostat
-#
+
 import json
 import requests
 import shelve
 import time
 import sys
 
-import subprocess
-import pyecobee_lib
+# Initialize token shelf on first run only
+#apiKey = 'API KEY'
+#api_token = 'API TOKEN'
+#refresh_token = 'REFRESH TOKEN'
+#thermostat_id = 'THERMOSTAT ID'
+#config = shelve.open('ecobeeConfig')
+#config['api_key'] = apiKey
+#config['api_token'] = api_token
+#config['refresh_token'] = refresh_token
+#config['thermostat_id'] = thermostat_id
+#config.close()
 
-apiKey = 'API KEY'
-api_token = 'YOUR API TOKEN'
-refresh_token = 'YOUR REFRESH TOKEN'
-
-# ecobee API Urls, thermostat identifier and default set temperature
+# ecobee API Urls and temps
 api_url_base = 'https://api.ecobee.com/1/'
 auth_url_base = 'https://api.ecobee.com/token'
-thermostat_id = 'THERMOSTAT ID'
 ecobeeActualTemp = 0
 ecobeeSetTemp = 0
-ecobeeMode = ''
 
-#d = shelve.open('ecobeeConfig')
-#d['api_token'] = api_token
-#d['refresh_token'] = refresh_token
-#d.close()
+#Retrieve API key from shelf
+config = shelve.open('ecobeeConfig')
+apiKey = config['api_key']
+thermostat_id = config['thermostat_id']
+config.close()
 
 # Function to get thermostat information
 def get_thermostat_info():
     update_authorization()
     config = shelve.open('ecobeeConfig')
     current_api_token = config['api_token']
+    config.close()
 
     headers = {'Content-Type': 'application/json',
                'Authorization': 'Bearer {0}'.format(current_api_token)}
@@ -48,6 +53,9 @@ def get_thermostat_info():
         resp_dict = json.loads(response.text)
         print('Name: ' + resp_dict['thermostatList'][0]['name'])
         print('Actual Temperature: ' + str(resp_dict['thermostatList'][0]['runtime']['actualTemperature']))
+
+        actualTemperature = int(resp_dict['thermostatList'][0]['runtime']['actualTemperature'])
+        return actualTemperature;
     else:
         return -1
 
@@ -57,6 +65,7 @@ def get_thermostat_mode():
     update_authorization()
     config = shelve.open('ecobeeConfig')
     current_api_token = config['api_token']
+    config.close()
 
     headers = {'Content-Type': 'application/json',
                    'Authorization': 'Bearer {0}'.format(current_api_token)}
@@ -111,13 +120,15 @@ def update_authorization():
             config['refresh_token'] = response.json()['refresh_token']
             config.close()
         else:
+            config.close()
             print(response.status_code)
 
-# Function to get ecobee temperature data
-def get_thermostat(getHoldTemperature):
+# Function to get ecobee temperature data NEEDS TO BE EDITED FROM OLD SET TEMP FUNCTION
+def get_thermostatdata():
     update_authorization()
     config = shelve.open('ecobeeConfig')
     current_api_token = config['api_token']
+    config.close()
 
     headers = {'Content-Type': 'application/json',
                'Authorization': 'Bearer {0}'.format(current_api_token)}
@@ -137,3 +148,8 @@ def get_thermostat(getHoldTemperature):
 # Setup while loop precondition variables
 prev_millis = int(round(time.time() * 1000))
 
+
+millis = int(round(time.time() * 1000))
+
+#get_thermostat_info()
+get_thermostat_mode()
