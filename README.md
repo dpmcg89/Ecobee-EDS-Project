@@ -1,1 +1,1 @@
-Test for historizing Ecobee Smart Thermostat data using OSIsofts Edge Data Store (EDS)
+Test for historizing Ecobee Smart Thermostat data using OSIsoft's Edge Data Store (EDS)
