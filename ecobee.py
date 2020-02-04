@@ -19,20 +19,24 @@ import sys
 #config['thermostat_id'] = thermostat_id
 #config.close()
 
-# ecobee API Urls and temps
+# ecobee API urls and params
 api_url_base = 'https://api.ecobee.com/1/'
 auth_url_base = 'https://api.ecobee.com/token'
 ecobeeActualTemp = 0
 ecobeeSetTemp = 0
 
-#Retrieve API key from shelf
+
+# OSIsoft EDS urls
+eds_url_base = 'http://localhost:5590/api/v1/tenants/default/namespaces/default/omf/'
+
+# Retrieve API key from shelf
 config = shelve.open('ecobeeConfig')
 apiKey = config['api_key']
 thermostat_id = config['thermostat_id']
 config.close()
 
 # Function to get thermostat information
-def get_thermostat_info():
+def get_thermostat_data():
     update_authorization()
     config = shelve.open('ecobeeConfig')
     current_api_token = config['api_token']
@@ -42,48 +46,52 @@ def get_thermostat_info():
                'Authorization': 'Bearer {0}'.format(current_api_token)}
 
     # Get basic thermostat settings
-    params = [{"selection":{"selectionType":"thermostats","selectionMatch":thermostat_id,"includeRuntime":True}}]
+    params = [{"selection":{"selectionType":"thermostats","selectionMatch":thermostat_id,"includeWeather":True,"includeRuntime":True,"includeSettings":True}}]
     params_json = json.dumps(params[0])
 
     api_url = '{0}thermostat?format=json&body='.format(api_url_base)
 
     response = requests.get(api_url + params_json, headers=headers)
+    #print(response.text)
 
     if response.status_code == 200:
         resp_dict = json.loads(response.text)
-        print('Name: ' + resp_dict['thermostatList'][0]['name'])
-        print('Actual Temperature: ' + str(resp_dict['thermostatList'][0]['runtime']['actualTemperature']))
+        
+        ecobeejsonData = [{
+            "containerid": "ecobeeContainer",
+            "values": [{
+                "timestamp": resp_dict['thermostatList'][0]['runtime']['lastStatusModified'],
+                "name": resp_dict['thermostatList'][0]['name'],
+                "lastModified": resp_dict['thermostatList'][0]['runtime']['lastModified'],
+                "connected": resp_dict['thermostatList'][0]['runtime']['connected'],
+                "actualTemperature": resp_dict['thermostatList'][0]['runtime']['actualTemperature'],
+                "actualHumidity": resp_dict['thermostatList'][0]['runtime']['actualHumidity'],
+                "rawTemperature": resp_dict['thermostatList'][0]['runtime']['rawTemperature'],
+                "desiredHeat": resp_dict['thermostatList'][0]['runtime']['desiredHeat'],
+                "desiredCool": resp_dict['thermostatList'][0]['runtime']['desiredCool'],
+                "desiredFanMode": resp_dict['thermostatList'][0]['runtime']['desiredFanMode'],
+                "HVAC Mode": resp_dict['thermostatList'][0]['settings']['hvacMode'],
+                "forecast_weatherSymbol": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['weatherSymbol'],
+                "forecast_condition": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['condition'],
+                "forecast_temperature": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['temperature'],
+                "forecast_pressure": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['pressure'],
+                "forecast_relativeHumidity": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['relativeHumidity'],
+                "forecast_dewpoint": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['dewpoint'],
+                "forecast_visibility": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['visibility'],
+                "forecast_windSpeed": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windSpeed'],
+                "forecast_windGust": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windGust'],
+                "forecast_windDirection": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windDirection'],
+                "forecast_windBearing": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windBearing'],
+                "forecast_pop": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['pop'],
+                "forecast_tempHigh": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['tempHigh'],
+                "forecast_tempLow": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['tempLow'],
+                "forecast_sky": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['sky']
+                }]
+            }]
 
-        actualTemperature = int(resp_dict['thermostatList'][0]['runtime']['actualTemperature'])
-        return actualTemperature;
+        return ecobeejsonData
     else:
         return -1
-
-
-# Function to get thermostat mode
-def get_thermostat_mode():
-    update_authorization()
-    config = shelve.open('ecobeeConfig')
-    current_api_token = config['api_token']
-    config.close()
-
-    headers = {'Content-Type': 'application/json',
-                   'Authorization': 'Bearer {0}'.format(current_api_token)}
-
-    # Get basic thermostat settings
-    params = [{"selection": {"selectionType": "thermostats", "selectionMatch": thermostat_id, "includeSettings": True}}]
-    params_json = json.dumps(params[0])
-
-    api_url = '{0}thermostat?format=json&body='.format(api_url_base)
-
-    response = requests.get(api_url + params_json, headers=headers)
-
-    if response.status_code == 200:
-        resp_dict = json.loads(response.text)
-        print('HVAC Mode: ' + str(resp_dict['thermostatList'][0]['settings']['hvacMode']))
-        return str(resp_dict['thermostatList'][0]['settings']['hvacMode'])
-    else:
-        return ''
 
 # Function to update ecobee API authorization
 def update_authorization():
@@ -103,7 +111,7 @@ def update_authorization():
     response = requests.get(api_url + params_json, headers=headers)
 
     if response.status_code == 200:
-        print('Current token still valid, returning.')
+        #print('Current token still valid, returning.')
         return ''
     else:
         current_refresh_token = config['refresh_token']
@@ -114,42 +122,128 @@ def update_authorization():
         response = requests.post(auth_url_base,params=params)
 
         if response.status_code == 200:
-            print('Token was expired, getting new token.')
-            print(response.text)
+            #print('Token was expired, getting new token.')
+            #print(response.text)
             config['api_token'] = response.json()['access_token']
             config['refresh_token'] = response.json()['refresh_token']
             config.close()
         else:
             config.close()
-            print(response.status_code)
+            #print(response.status_code)
 
-# Function to get ecobee temperature data NEEDS TO BE EDITED FROM OLD SET TEMP FUNCTION
-def get_thermostatdata():
-    update_authorization()
-    config = shelve.open('ecobeeConfig')
-    current_api_token = config['api_token']
-    config.close()
+# Define OMF Type
+OMF_Ecobee_Type = [{
+    "id": "ecobee",
+    "classification": "dynamic",
+    "type": "object",
+    "version": "1.0.0.0",
+    "properties": {
+        "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "isindex": True
+        },
+        "name": {
+            "type": "string",
+            "isname": True
+        },
+        "lastModified": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "connected": {
+            "type": "string"
+        },
+        "actualTemperature": {
+            "type": "number",
+            "format": "float32"
+        },
+        "actualHumidity": {
+            "type": "number",
+            "format": "float32"
+        },
+        "rawTemperature": {
+            "type": "number",
+            "format": "float32"
+        },
+        "desiredHeat": {
+            "type": "number",
+            "format": "float32"
+        },
+        "desiredCool": {
+            "type": "number",
+            "format": "float32"
+        },
+        "desiredFanMode": {
+            "type": "number",
+            "format": "float32"
+        },
+        "HVAC Mode": {
+            "type": "string"
+        },
+        "forecast_weatherSymbol": {
+            "type": "integer",
+            "format": "int32"
+        },
+        "forecast_condition": {
+            "type": "string"
+        },
+        "forecast_temperature": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_pressure": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_relativeHumidity": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_dewpoint": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_visibility": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_windSpeed": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_windGust": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_windDirection": {
+            "type": "string"
+        },
+        "forecast_windBearing": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_pop": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_tempHigh": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_tempLow": {
+            "type": "number",
+            "format": "float32"
+        },
+        "forecast_sky": {
+            "type": "integer",
+            "format": "int32"
+        }
+    }
+}]
 
-    headers = {'Content-Type': 'application/json',
-               'Authorization': 'Bearer {0}'.format(current_api_token)}
-
-    params = [{"selection":{"selectionType":"thermostats","selectionMatch":thermostat_id},"functions":[{"type":"setHold","params":{"holdType":"nextTransition","heatHoldTemp":setHoldTemperature,"coolHoldTemp":setHoldTemperature}}]}]
-    params_json = json.dumps(params[0])
-
-    api_url = '{0}thermostat?format=json'.format(api_url_base)
-
-    response = requests.post(api_url,params_json,headers=headers)
-
-    if response.status_code == 200:
-        print(response.text)
-    else:
-        print(response.status_code)
-
-# Setup while loop precondition variables
-prev_millis = int(round(time.time() * 1000))
-
-
-millis = int(round(time.time() * 1000))
-
-#get_thermostat_info()
-get_thermostat_mode()
+# Run loop to send data over to EDS
+while True:
+    EDSContainerupdate = get_thermostat_data()
+    print(EDSContainerupdate)
+    time.sleep(90)
