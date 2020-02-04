@@ -19,11 +19,9 @@ import sys
 #config['thermostat_id'] = thermostat_id
 #config.close()
 
-# ecobee API urls and params
+# ecobee API urls
 api_url_base = 'https://api.ecobee.com/1/'
 auth_url_base = 'https://api.ecobee.com/token'
-ecobeeActualTemp = 0
-ecobeeSetTemp = 0
 
 
 # OSIsoft EDS urls
@@ -91,6 +89,7 @@ def get_thermostat_data():
 
         return ecobeejsonData
     else:
+        print("Communication Error: " + str(response.status_code))
         return -1
 
 # Function to update ecobee API authorization
