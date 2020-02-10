@@ -1,5 +1,5 @@
 # ecobee Edge Data Store Historian
-# Simple Python script to read ecobee data remotely for a thermostat
+# Python script to read ecobee data remotely for a thermostat and write the data to EDS via OMF endpoint
 
 import json
 import requests
@@ -12,7 +12,7 @@ import sys
 #api_token = 'API TOKEN'
 #refresh_token = 'REFRESH TOKEN'
 #thermostat_id = 'THERMOSTAT ID'
-#config = shelve.open('ecobeeConfig')
+#config = shelve.open('ecobeeConfig',protocol=2)
 #config['api_key'] = apiKey
 #config['api_token'] = api_token
 #config['refresh_token'] = refresh_token
@@ -23,12 +23,12 @@ import sys
 api_url_base = 'https://api.ecobee.com/1/'
 auth_url_base = 'https://api.ecobee.com/token'
 
-
-# OSIsoft EDS urls
+# OSIsoft urls
 eds_url_base = 'http://localhost:5590/api/v1/tenants/default/namespaces/default/omf/'
+omfVersion = '1.1'
 
 # Retrieve API key from shelf
-config = shelve.open('ecobeeConfig')
+config = shelve.open('ecobeeConfig',protocol=2)
 apiKey = config['api_key']
 thermostat_id = config['thermostat_id']
 config.close()
@@ -36,7 +36,7 @@ config.close()
 # Function to get thermostat information
 def get_thermostat_data():
     update_authorization()
-    config = shelve.open('ecobeeConfig')
+    config = shelve.open('ecobeeConfig',protocol=2)
     current_api_token = config['api_token']
     config.close()
 
@@ -55,37 +55,36 @@ def get_thermostat_data():
     if response.status_code == 200:
         resp_dict = json.loads(response.text)
         
-        ecobeejsonData = [{
-            "containerid": "ecobeeContainer",
-            "values": [{
-                "timestamp": resp_dict['thermostatList'][0]['runtime']['lastStatusModified'],
-                "name": resp_dict['thermostatList'][0]['name'],
-                "lastModified": resp_dict['thermostatList'][0]['runtime']['lastModified'],
-                "connected": resp_dict['thermostatList'][0]['runtime']['connected'],
-                "actualTemperature": resp_dict['thermostatList'][0]['runtime']['actualTemperature'],
-                "actualHumidity": resp_dict['thermostatList'][0]['runtime']['actualHumidity'],
-                "rawTemperature": resp_dict['thermostatList'][0]['runtime']['rawTemperature'],
-                "desiredHeat": resp_dict['thermostatList'][0]['runtime']['desiredHeat'],
-                "desiredCool": resp_dict['thermostatList'][0]['runtime']['desiredCool'],
-                "desiredFanMode": resp_dict['thermostatList'][0]['runtime']['desiredFanMode'],
-                "HVAC Mode": resp_dict['thermostatList'][0]['settings']['hvacMode'],
-                "forecast_weatherSymbol": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['weatherSymbol'],
-                "forecast_condition": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['condition'],
-                "forecast_temperature": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['temperature'],
-                "forecast_pressure": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['pressure'],
-                "forecast_relativeHumidity": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['relativeHumidity'],
-                "forecast_dewpoint": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['dewpoint'],
-                "forecast_visibility": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['visibility'],
-                "forecast_windSpeed": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windSpeed'],
-                "forecast_windGust": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windGust'],
-                "forecast_windDirection": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windDirection'],
-                "forecast_windBearing": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windBearing'],
-                "forecast_pop": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['pop'],
-                "forecast_tempHigh": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['tempHigh'],
-                "forecast_tempLow": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['tempLow'],
-                "forecast_sky": resp_dict['thermostatList'][0]['weather']['forecasts'][0]['sky']
+        ecobeejsonData = json.dumps([{
+            'containerid': 'DanHome',
+            'values': [{
+                'timestamp': resp_dict['thermostatList'][0]['runtime']['lastStatusModified'].replace(' ', 'T', 1) + 'Z',
+                'lastModified': resp_dict['thermostatList'][0]['runtime']['lastModified'].replace(' ', 'T', 1) + 'Z',
+                'connected': resp_dict['thermostatList'][0]['runtime']['connected'],
+                'actualTemperature': resp_dict['thermostatList'][0]['runtime']['actualTemperature'],
+                'actualHumidity': resp_dict['thermostatList'][0]['runtime']['actualHumidity'],
+                'rawTemperature': resp_dict['thermostatList'][0]['runtime']['rawTemperature'],
+                'desiredHeat': resp_dict['thermostatList'][0]['runtime']['desiredHeat'],
+                'desiredCool': resp_dict['thermostatList'][0]['runtime']['desiredCool'],
+                'desiredFanMode': resp_dict['thermostatList'][0]['runtime']['desiredFanMode'],
+                'HVAC Mode': resp_dict['thermostatList'][0]['settings']['hvacMode'],
+                'forecast_weatherSymbol': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['weatherSymbol'],
+                'forecast_condition': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['condition'],
+                'forecast_temperature': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['temperature'],
+                'forecast_pressure': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['pressure'],
+                'forecast_relativeHumidity': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['relativeHumidity'],
+                'forecast_dewpoint': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['dewpoint'],
+                'forecast_visibility': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['visibility'],
+                'forecast_windSpeed': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windSpeed'],
+                'forecast_windGust': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windGust'],
+                'forecast_windDirection': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windDirection'],
+                'forecast_windBearing': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['windBearing'],
+                'forecast_pop': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['pop'],
+                'forecast_tempHigh': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['tempHigh'],
+                'forecast_tempLow': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['tempLow'],
+                'forecast_sky': resp_dict['thermostatList'][0]['weather']['forecasts'][0]['sky']
                 }]
-            }]
+            }])
 
         return ecobeejsonData
     else:
@@ -95,7 +94,7 @@ def get_thermostat_data():
 # Function to update ecobee API authorization
 def update_authorization():
     # Make a call to see if the current token is valid
-    config = shelve.open('ecobeeConfig')
+    config = shelve.open('ecobeeConfig',protocol=2)
     current_api_token = config['api_token']
 
     headers = {'Content-Type': 'application/json',
@@ -131,20 +130,15 @@ def update_authorization():
             #print(response.status_code)
 
 # Define OMF Type
-OMF_Ecobee_Type = [{
+OMF_Ecobee_Type = json.dumps([{
     "id": "ecobee",
     "classification": "dynamic",
     "type": "object",
-    "version": "1.0.0.0",
     "properties": {
         "timestamp": {
             "type": "string",
             "format": "date-time",
             "isindex": True
-        },
-        "name": {
-            "type": "string",
-            "isname": True
         },
         "lastModified": {
             "type": "string",
@@ -174,8 +168,7 @@ OMF_Ecobee_Type = [{
             "format": "float32"
         },
         "desiredFanMode": {
-            "type": "number",
-            "format": "float32"
+            "type": "string"
         },
         "HVAC Mode": {
             "type": "string"
@@ -239,10 +232,48 @@ OMF_Ecobee_Type = [{
             "format": "int32"
         }
     }
-}]
+}])
+
+# Define OMF Container
+OMF_Ecobee_Container = json.dumps([{
+    "id": "DanHome",
+    "typeid": "ecobee"
+}])
+
+# Function to build headers for EDS post
+def getHeaders(message_type='', action=''):
+    msg_headers = {
+        'Content-Type': 'application/json',
+        'producertoken': 'x',
+        'omfversion': str(omfVersion),
+        'action': action,
+        'messageformat': 'json',
+        'messagetype': message_type
+    }
+    return msg_headers
+
+# Function to post to EDS
+def send_omf(endpoint_url, message_omf_json, message_type='', action='create'):
+    headers = getHeaders(message_type, action)
+
+    response = requests.post(endpoint_url, data=message_omf_json, headers=headers)
+
+    if response.status_code >= 200 and response.status_code <= 204:
+        print("EDS data written successfully. " + response.text)
+        return response
+    else:
+        print("Communication Error: " + str(response.status_code)) + " " + response.text
+        return response.status_code
+
+# Create OMF Type
+send_omf(eds_url_base, OMF_Ecobee_Type, 'type', 'create')
+
+# Create OMF Container
+send_omf(eds_url_base, OMF_Ecobee_Container, 'container', 'create')
+
 
 # Run loop to send data over to EDS
 while True:
     EDSContainerupdate = get_thermostat_data()
-    print(EDSContainerupdate)
+    send_omf(eds_url_base, EDSContainerupdate, 'data', 'create')
     time.sleep(90)
